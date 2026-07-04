@@ -16,7 +16,7 @@ const ZoneSlide = () => {
                        <div className="flex items-center gap-3">
 
                           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-white font-bold text-xl">
-                            G
+                            Z
                           </div>
 
                           <div className=" sm:block">
