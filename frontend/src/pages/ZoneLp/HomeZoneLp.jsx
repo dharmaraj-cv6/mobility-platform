@@ -52,13 +52,13 @@ export default function Home() {
 ];
 
   const integrations = [
-    "Claude",
-    "ChatGPT",
-    "VS Code",
-    "MCP",
-    "Figma",
-    "Adobe",
-    "Plugins",
+    "Term1",
+    "Term2",
+    "Term3",
+    "Term4",
+    "Term5",
+    "Term6",
+    "Term7",
   ];
 
   return (
@@ -67,23 +67,23 @@ export default function Home() {
       {/* Announcement */}
       <div className="flex items-center justify-center gap-3 py-3 border-b bg-white">
         <span className="px-2 py-1 text-xs bg-pink-500 text-white rounded">
-          NEW
+          menu1
         </span>
 
         <span className="font-semibold">
-          Google Gemini Omni.
+          menu1
         </span>
 
         <span className="text-gray-500">
-          Direct video with your own words
+         menu1
         </span>
 
         <button className="px-4 py-1 bg-black text-white rounded-lg">
-          Try it now
+         menu1
         </button>
 
         <a href="/" className="text-pink-600">
-          Pricing
+          menu1
         </a>
       </div>
 
@@ -188,11 +188,11 @@ export default function Home() {
           <div>
 
             <span className="font-semibold">
-              Use Magnific in your favorite tools.
+              Origin and History
             </span>
 
             <span className="text-gray-500 ml-2">
-              Claude, ChatGPT, Figma, Photoshop, After Effects and more.
+             “Lorem ipsum” is dummy text used in graphic design and publishing. 
             </span>
 
           </div>
