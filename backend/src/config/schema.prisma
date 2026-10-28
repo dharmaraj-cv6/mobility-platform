@@ -1,0 +1,603 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id       Int    @id @default(autoincrement())
+  fullName String
+  phone    String @unique
+
+  role     UserRole @default(PASSENGER)
+  isActive Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  otpVerifications OtpVerification[]
+
+  passengerBookings Booking[] @relation("PassengerBookings")
+  driverBookings    Booking[] @relation("DriverBookings")
+
+  passengerRatings Rating[] @relation("PassengerRatings")
+  driverRatings    Rating[] @relation("DriverRatings")
+
+  cancellations Cancellation[]
+  subscriptions Subscription[]
+
+  driverPricing DriverPricing?
+
+  notifications Notification[]
+
+  rideEarnings DriverRideEarning[]
+
+  adminVerificationLogs AdminVerificationLog[] @relation("AdminVerificationLogs")
+
+  verificationLogs AdminVerificationLog[] @relation("UserVerificationLogs")
+
+  driverProfile    DriverProfile?
+  passengerProfile PassengerProfile?
+
+  userRequests UserRequest[]
+}
+
+model DriverProfile {
+  id        Int @id @default(autoincrement())
+  userId    Int @unique
+
+  dob           DateTime?
+  gender        String?
+  aadhaar       String? @unique
+  licenceNumber String? @unique
+
+  address  String?
+  district String?
+  state    String?
+  pincode  String?
+
+  businessType BusinessType
+  driverStatus DriverStatus @default(PENDING)
+
+  onboardingStep      Int     @default(1)
+  onboardingCompleted Boolean @default(false)
+
+  verifiedBy Int?
+  verifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  availability   DriverAvailability?
+  documents      DriverDocument[]
+  experience     DriverExperience?
+  paymentProfile DriverPaymentProfile?
+  services       DriverService[]
+  Vehicle        Vehicle[]
+}
+
+model DriverService {
+  id          Int               @id @default(autoincrement())
+  driverId    Int
+  serviceType DriverServiceType
+
+  fare        Json?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  driverProfile DriverProfile @relation(
+    fields: [driverId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  @@unique([driverId, serviceType])
+  @@index([driverId])
+}
+
+model DriverPaymentProfile {
+  id           Int           @id @default(autoincrement())
+  driverId     Int           @unique
+  upiId        String?
+  mobileNumber String?
+  acceptCash   Boolean       @default(true)
+  qrEnabled    Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  driver       DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+}
+
+model PassengerProfile {
+  id             Int            @id @default(autoincrement())
+  userId         Int            @unique
+  dob            DateTime?
+  gender         String?
+  profileImage   String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  savedAddresses SavedAddress[]
+}
+
+model SavedAddress {
+  id                 Int              @id @default(autoincrement())
+  passengerProfileId Int
+  title              String
+  address            String
+  latitude           Float
+  longitude          Float
+  isDefault          Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  passengerProfile   PassengerProfile @relation(fields: [passengerProfileId], references: [id], onDelete: Cascade)
+}
+
+model DriverExperience {
+  id              Int           @id @default(autoincrement())
+  driverProfileId Int           @unique
+  experience      String
+  workedPlatforms Json?
+  languages       Json?
+  driverProfile   DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+}
+
+model DriverAvailability {
+  id               Int           @id @default(autoincrement())
+  driverProfileId  Int           @unique
+  isOnline         Boolean       @default(false)
+  currentLatitude  Float?
+  currentLongitude Float?
+  lastSeen         DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  driverProfile    DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+}
+
+model Vehicle {
+  id              Int @id @default(autoincrement())
+  driverProfileId Int
+
+  vehicleType   VehicleType
+  vehicleNumber String
+  model         String
+  seatCapacity  Int
+
+  brand              String?
+  registrationNumber String? @unique
+  manufacturingYear  Int?
+  fuelType           String?
+  color              String?
+
+  isActive           Boolean            @default(true)
+  isDefault          Boolean            @default(false)
+  verificationStatus VerificationStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  adminVerificationLogs AdminVerificationLog[]
+
+  DriverProfile DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+
+  documents VehicleDocument[]
+
+  @@index([driverProfileId])
+}
+
+model DriverDocument {
+  id                    Int                    @id @default(autoincrement())
+  driverProfileId       Int
+  documentType          DriverDocumentType
+  fileUrl               String
+  verificationStatus    VerificationStatus     @default(PENDING)
+  uploadedAt            DateTime               @default(now())
+  adminVerificationLogs AdminVerificationLog[]
+  driverProfile         DriverProfile          @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+}
+
+model VehicleDocument {
+  id                 Int                    @id @default(autoincrement())
+  vehicleId          Int
+  documentType       VehicleDocumentType
+  fileUrl            String
+  verificationStatus VerificationStatus     @default(PENDING)
+  uploadedAt         DateTime               @default(now())
+  verificationLogs   AdminVerificationLog[]
+  vehicle            Vehicle                @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model Booking {
+  id                Int             @id @default(autoincrement())
+  passengerId       Int
+  driverId          Int?
+  rideType          RideType
+  pickupAddress     String
+  pickupLatitude    Float?
+  pickupLongitude   Float?
+  dropAddress       String
+  dropLatitude      Float?
+  dropLongitude     Float?
+  estimatedDistance Float?
+  estimatedFare     Float?
+  status            BookingStatus   @default(REQUEST_SENT)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  arrivalFilter     Int
+  driverShareCount  Int             @default(0)
+  platformTaken     Boolean         @default(false)
+  serviceZone       ServiceZone
+  vehicleType       VehicleCategory
+  driver            User?           @relation("DriverBookings", fields: [driverId], references: [id], onDelete: Cascade)
+  passenger         User            @relation("PassengerBookings", fields: [passengerId], references: [id], onDelete: Cascade)
+  cancellation      Cancellation?
+  ride              Ride?
+
+  @@index([passengerId])
+  @@index([driverId])
+  @@index([status])
+}
+
+model Ride {
+  id             Int                @id @default(autoincrement())
+  bookingId      Int                @unique
+  startTime      DateTime?
+  endTime        DateTime?
+  actualDistance Float?
+  actualFare     Float?
+  status         RideStatus         @default(STARTED)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  driverEarning  DriverRideEarning?
+  Payment        Payment?
+  rating         Rating?
+  booking        Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model Rating {
+  id          Int      @id @default(autoincrement())
+  rideId      Int      @unique
+  passengerId Int
+  driverId    Int
+  rating      Int
+  review      String?
+  createdAt   DateTime @default(now())
+  driver      User     @relation("DriverRatings", fields: [driverId], references: [id], onDelete: Cascade)
+  passenger   User     @relation("PassengerRatings", fields: [passengerId], references: [id], onDelete: Cascade)
+  ride        Ride     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@index([passengerId])
+  @@index([driverId])
+}
+
+model Cancellation {
+  id            Int                @id @default(autoincrement())
+  bookingId     Int                @unique
+  cancelledById Int
+  reason        CancellationReason
+  remarks       String?
+  cancelledAt   DateTime           @default(now())
+  booking       Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  cancelledBy   User               @relation(fields: [cancelledById], references: [id], onDelete: Cascade)
+
+  @@index([cancelledById])
+}
+
+model Subscription {
+  id            Int                @id @default(autoincrement())
+  driverId      Int
+  plan          SubscriptionPlan
+  amount        Decimal            @db.Decimal(10, 2)
+  startDate     DateTime
+  endDate       DateTime
+  status        SubscriptionStatus @default(PENDING)
+  transactionId String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  driver        User               @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([status])
+}
+
+model DriverPricing {
+  id                     Int      @id @default(autoincrement())
+  driverId               Int      @unique
+  baseFare               Decimal  @db.Decimal(10, 2)
+  pricePerKm             Decimal  @db.Decimal(10, 2)
+  minimumFare            Decimal  @db.Decimal(10, 2)
+  maximumFare            Decimal  @db.Decimal(10, 2)
+  waitingChargePerMinute Decimal  @db.Decimal(10, 2)
+  nightChargePercentage  Float?
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  driver                 User     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+model DriverRideEarning {
+  id            Int           @id @default(autoincrement())
+  driverId      Int
+  rideId        Int           @unique
+  fare          Decimal       @db.Decimal(10, 2)
+  paymentMethod PaymentMethod
+  paymentStatus PaymentStatus
+  createdAt     DateTime      @default(now())
+  driver        User          @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  ride          Ride          @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+}
+
+model AdminVerificationLog {
+  id                Int                @id @default(autoincrement())
+  adminId           Int
+  userId            Int?
+  vehicleId         Int?
+  driverDocumentId  Int?
+  vehicleDocumentId Int?
+  target            VerificationTarget
+  status            VerificationStatus
+  remarks           String?
+  verifiedAt        DateTime           @default(now())
+  admin             User               @relation("AdminVerificationLogs", fields: [adminId], references: [id], onDelete: Cascade)
+  driverDocument    DriverDocument?    @relation(fields: [driverDocumentId], references: [id])
+  user              User?              @relation("UserVerificationLogs", fields: [userId], references: [id])
+  vehicleDocument   VehicleDocument?   @relation(fields: [vehicleDocumentId], references: [id])
+  vehicle           Vehicle?           @relation(fields: [vehicleId], references: [id])
+
+  @@index([adminId])
+  @@index([userId])
+}
+
+model Payment {
+  id            Int           @id @default(autoincrement())
+  rideId        Int           @unique
+  amount        Decimal       @db.Decimal(10, 2)
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime
+  Ride          Ride          @relation(fields: [rideId], references: [id], onDelete: Cascade)
+}
+
+enum UserRole {
+  PASSENGER
+  DRIVER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum BusinessType {
+  ACTIVE_DRIVER
+  VEHICLE_OWNER
+  DRIVER_OWNER
+}
+
+enum DriverStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  SUSPENDED
+}
+
+enum VehicleType {
+  BIKE
+  AUTO
+  CAB_4
+  CAB_5
+  CAB_7
+  CAB_9
+  MINI_BUS
+  BUS
+  LCV
+  HCV
+}
+
+enum DriverDocumentType {
+  PROFILE_PHOTO
+  AADHAAR
+  DRIVING_LICENSE
+  RC_BOOK
+  INSURANCE
+  FITNESS
+  PERMIT
+  POLLUTION
+}
+
+enum VehicleDocumentType {
+  RC_BOOK
+  INSURANCE
+  FITNESS
+  PERMIT
+  POLLUTION
+}
+
+enum RideStatus {
+  STARTED
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum CancellationReason {
+  PASSENGER_CANCELLED
+  DRIVER_CANCELLED
+  NO_RESPONSE
+  NO_SHOW
+  VEHICLE_ISSUE
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum SubscriptionPlan {
+  BIKE
+  AUTO
+  CAB
+  CAB_PREMIUM
+  MINI_BUS
+  BUS
+}
+
+enum NotificationType {
+  BOOKING
+  RIDE
+  PAYMENT
+  SUBSCRIPTION
+  SYSTEM
+  PROMOTION
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum VerificationTarget {
+  DRIVER
+  VEHICLE
+  DRIVER_DOCUMENT
+  VEHICLE_DOCUMENT
+}
+
+enum ServiceZone {
+  CITY
+  CORPORATE
+  SCHOOL
+  CARGO
+  TOUR
+  EQUIPMENT
+  EVENT
+  EMERGENCY
+}
+
+enum RideType {
+  BOOK_NOW
+  BOOK_LATER
+  JOINED_RIDE
+}
+
+enum VehicleCategory {
+  AUTO
+  CAB
+  VAN
+  BUS
+}
+
+enum BookingStatus {
+  REQUEST_SENT
+  DRIVER_SHARED
+  DRIVER_ACCEPTED
+  PLATFORM_PENDING
+  PLATFORM_TAKEN
+  DRIVER_MOVING
+  DRIVER_ARRIVED
+  RIDE_STARTED
+  DESTINATION_REACHED
+  PAYMENT_COMPLETED
+  FEEDBACK_SUBMITTED
+}
+
+enum DriverServiceType {
+  CITYRIDES
+  CORPORATE
+  SCHOOL
+  CARGO
+  TOURIST
+  YATRA
+}
+
+
+model OtpVerification {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+
+enum UserRequestType {
+  DRIVER
+  OWNER_CUM_DRIVER
+  COMPANY
+  RENTAL_VEHICLES
+}
+
+enum UserRequestStatus {
+  PENDING
+  APPROVED
+  ON_HOLD
+  REJECTED
+}
+
+model UserRequest {
+  id Int @id @default(autoincrement())
+
+  userId Int
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  requestType UserRequestType
+
+  businessType String?
+
+  status UserRequestStatus @default(PENDING)
+
+  reviewedAt DateTime?
+  reviewedBy Int?
+
+  reviewNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([requestType])
+  @@index([status])
+  @@index([createdAt])
+}
