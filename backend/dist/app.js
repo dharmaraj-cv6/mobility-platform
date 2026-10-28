@@ -26,6 +26,9 @@ import reportsRoutes from "./modules/admin/reports.routes.js";
 import notificationRoutes from "./modules/admin/notification/notification.routes.js";
 import onboardingRoutes from "./modules/driver/routes/onboarding.routes.js";
 import driverRoutes from "./modules/driver/driver.routes.js";
+import watcherRoutes from "./modules/watcheralert/watcher.routes.js";
+import userManagementRoutes from "./modules/admin/usermanagement/user-management.routes.js";
+import rideManagementRoutes from "./modules/admin/ridemanagement/ride-management.routes.js";
 // =====================================================
 // APP
 // =====================================================
@@ -33,28 +36,32 @@ const app = express();
 // =====================================================
 // CORS
 // =====================================================
-//
-// Express 5 + path-to-regexp:
-// DO NOT use:
-// app.options("*", ...)
-//
-// cors middleware itself handles OPTIONS requests.
-//
 const allowedOrigins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ];
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests without Origin
-        // such as Postman / server-to-server requests.
+        // Allow requests without Origin header
+        // Example: Postman / server-to-server requests
         if (!origin) {
-            return callback(null, true);
+            callback(null, true);
+            return;
         }
+        // Allow known frontend origins
         if (allowedOrigins.includes(origin)) {
-            return callback(null, true);
+            callback(null, true);
+            return;
         }
-        return callback(new Error(`CORS blocked for origin: ${origin}`));
+        // Development: allow localhost / 127.0.0.1
+        // on any frontend port
+        if (/^http:\/\/localhost:\d+$/.test(origin) ||
+            /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) {
+            callback(null, true);
+            return;
+        }
+        // Reject unknown origins
+        callback(null, false);
     },
     credentials: true,
     methods: [
@@ -68,7 +75,11 @@ app.use(cors({
     allowedHeaders: [
         "Content-Type",
         "Authorization",
+        "Accept",
+        "Cache-Control",
+        "Pragma",
     ],
+    optionsSuccessStatus: 204,
 }));
 // =====================================================
 // SECURITY
@@ -105,6 +116,8 @@ app.use("/api/auth", authRoutes);
 // ADMIN
 // =====================================================
 app.use("/api/admin", adminRoutes);
+app.use("/api/admin/users", userManagementRoutes);
+app.use("/api/admin/rides", rideManagementRoutes);
 app.use("/api/reports", reportsRoutes);
 app.use("/api/notifications", notificationRoutes);
 // =====================================================
@@ -123,6 +136,7 @@ app.use("/api/driver-earnings", earningsRoutes);
 // BOOKING
 // =====================================================
 app.use("/api/bookings", bookingRoutes);
+app.use("/api/watcheralert", watcherRoutes);
 // =====================================================
 // RIDES
 // =====================================================

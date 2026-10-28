@@ -117,39 +117,36 @@ export const getUserRequestById = async (id) => {
 // UPDATE USER REQUEST STATUS
 //
 // IMPORTANT:
+//
 // UserRequest.status is the review/request status.
 //
 // DriverProfile.driverStatus is the driver's actual
 // approval status used by the driver-side application.
 //
-// Your Prisma enum is:
-//
-// PENDING
-// VERIFIED
-// REJECTED
-// SUSPENDED
-//
-// Therefore we MUST use VERIFIED, not APPROVED, for the
-// driver profile.
+// Vehicle.verificationStatus is the vehicle's actual
+// admin verification status.
 //
 // APPROVE:
-//   UserRequest.status        -> APPROVED
-//   DriverProfile.driverStatus -> VERIFIED
-//   DriverProfile.verifiedBy   -> admin id
-//   DriverProfile.verifiedAt   -> current time
+//   UserRequest.status          -> APPROVED
+//   DriverProfile.driverStatus  -> VERIFIED
+//   Vehicle.verificationStatus  -> APPROVED
 //
 // HOLD:
-//   UserRequest.status        -> ON_HOLD
-//   DriverProfile.driverStatus -> PENDING
+//   UserRequest.status          -> ON_HOLD
+//   DriverProfile.driverStatus  -> PENDING
+//   Vehicle.verificationStatus  -> PENDING
 //
 // REJECT:
-//   UserRequest.status        -> REJECTED
-//   DriverProfile.driverStatus -> REJECTED
+//   UserRequest.status          -> REJECTED
+//   DriverProfile.driverStatus  -> REJECTED
+//   Vehicle.verificationStatus  -> REJECTED
 //
-// The update is transactional so the two states do not
-// become inconsistent.
+// Everything is handled inside one transaction.
 // ============================================================
 export const updateUserRequestStatus = async (id, status, reviewedBy, reviewNote) => {
+    // ----------------------------------------------------------
+    // Find current request
+    // ----------------------------------------------------------
     const currentRequest = await prisma.userRequest.findUnique({
         where: {
             id,
@@ -163,11 +160,17 @@ export const updateUserRequestStatus = async (id, status, reviewedBy, reviewNote
     if (!currentRequest) {
         throw new Error("User request not found.");
     }
+    // ----------------------------------------------------------
+    // Check whether this is a driver request
+    // ----------------------------------------------------------
     const isDriverRequest = DRIVER_REQUEST_TYPES.includes(currentRequest.requestType);
+    // ----------------------------------------------------------
+    // TRANSACTION
+    // ----------------------------------------------------------
     return prisma.$transaction(async (tx) => {
-        // ------------------------------------------------------
-        // 1. Update the admin review/request status.
-        // ------------------------------------------------------
+        // ======================================================
+        // 1. UPDATE USER REQUEST
+        // ======================================================
         const updatedRequest = await tx.userRequest.update({
             where: {
                 id,
@@ -199,14 +202,13 @@ export const updateUserRequestStatus = async (id, status, reviewedBy, reviewNote
                 },
             },
         });
-        // ------------------------------------------------------
-        // 2. Driver approval state.
-        //
-        // Only driver onboarding requests modify DriverProfile.
-        // Company/rental requests continue to use their own
-        // UserRequest status and do not require a DriverProfile.
-        // ------------------------------------------------------
+        // ======================================================
+        // 2. DRIVER + VEHICLE APPROVAL
+        // ======================================================
         if (isDriverRequest) {
+            // ----------------------------------------------------
+            // Find Driver Profile
+            // ----------------------------------------------------
             const driverProfile = await tx.driverProfile.findUnique({
                 where: {
                     userId: currentRequest.userId,
@@ -218,11 +220,17 @@ export const updateUserRequestStatus = async (id, status, reviewedBy, reviewNote
             if (!driverProfile) {
                 throw new Error("Driver profile not found for this request.");
             }
-            // ----------------------------------------------------
-            // APPROVED request -> VERIFIED driver
-            // ----------------------------------------------------
+            // ====================================================
+            // APPROVED
+            //
+            // Driver -> VERIFIED
+            // Vehicle -> APPROVED
+            // ====================================================
             if (status ===
                 "APPROVED") {
+                // --------------------------------------------------
+                // Approve Driver
+                // --------------------------------------------------
                 await tx.driverProfile.update({
                     where: {
                         id: driverProfile.id,
@@ -234,15 +242,29 @@ export const updateUserRequestStatus = async (id, status, reviewedBy, reviewNote
                         onboardingCompleted: true,
                     },
                 });
+                // --------------------------------------------------
+                // Approve ALL vehicles belonging to this driver
+                // --------------------------------------------------
+                await tx.vehicle.updateMany({
+                    where: {
+                        driverProfileId: driverProfile.id,
+                    },
+                    data: {
+                        verificationStatus: "APPROVED",
+                    },
+                });
             }
-            // ----------------------------------------------------
-            // ON HOLD -> keep driver unverified.
+            // ====================================================
+            // ON HOLD
             //
-            // DriverStatus has no ON_HOLD value, so PENDING is the
-            // correct locked state.
-            // ----------------------------------------------------
+            // Driver -> PENDING
+            // Vehicle -> PENDING
+            // ====================================================
             if (status ===
                 "ON_HOLD") {
+                // --------------------------------------------------
+                // Keep Driver unverified
+                // --------------------------------------------------
                 await tx.driverProfile.update({
                     where: {
                         id: driverProfile.id,
@@ -253,13 +275,29 @@ export const updateUserRequestStatus = async (id, status, reviewedBy, reviewNote
                         verifiedAt: null,
                     },
                 });
+                // --------------------------------------------------
+                // Keep vehicles pending
+                // --------------------------------------------------
+                await tx.vehicle.updateMany({
+                    where: {
+                        driverProfileId: driverProfile.id,
+                    },
+                    data: {
+                        verificationStatus: "PENDING",
+                    },
+                });
             }
-            // ----------------------------------------------------
-            // REJECTED -> permanently rejected until another
-            // onboarding/review flow changes it.
-            // ----------------------------------------------------
+            // ====================================================
+            // REJECTED
+            //
+            // Driver -> REJECTED
+            // Vehicle -> REJECTED
+            // ====================================================
             if (status ===
                 "REJECTED") {
+                // --------------------------------------------------
+                // Reject Driver
+                // --------------------------------------------------
                 await tx.driverProfile.update({
                     where: {
                         id: driverProfile.id,
@@ -270,12 +308,22 @@ export const updateUserRequestStatus = async (id, status, reviewedBy, reviewNote
                         verifiedAt: new Date(),
                     },
                 });
+                // --------------------------------------------------
+                // Reject ALL vehicles belonging to this driver
+                // --------------------------------------------------
+                await tx.vehicle.updateMany({
+                    where: {
+                        driverProfileId: driverProfile.id,
+                    },
+                    data: {
+                        verificationStatus: "REJECTED",
+                    },
+                });
             }
         }
-        // ------------------------------------------------------
-        // 3. Return fresh request data so Admin UI immediately
-        //    receives the updated driver status.
-        // ------------------------------------------------------
+        // ======================================================
+        // 3. RETURN FRESH REQUEST DATA
+        // ======================================================
         return tx.userRequest.findUnique({
             where: {
                 id,

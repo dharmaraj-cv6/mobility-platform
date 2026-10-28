@@ -99,3 +99,13 @@ export const setDefaultVehicle = async (driverProfileId, vehicleId) => {
         });
     });
 };
+export const updateVerificationStatus = async (vehicleId, status) => {
+    return prisma.vehicle.update({
+        where: {
+            id: vehicleId,
+        },
+        data: {
+            verificationStatus: status,
+        },
+    });
+};

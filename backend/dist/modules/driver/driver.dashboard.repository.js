@@ -26,7 +26,7 @@ export const getDashboard = async (userId) => {
     const endOfDay = new Date(now);
     endOfDay.setHours(23, 59, 59, 999);
     // --------------------------------------
-    // Today's Earnings
+    // TODAY'S EARNINGS
     // --------------------------------------
     const earnings = await prisma.driverRideEarning.findMany({
         where: {
@@ -38,18 +38,53 @@ export const getDashboard = async (userId) => {
         },
     });
     // --------------------------------------
-    // Calculate Earnings
+    // CALCULATE EARNINGS
     // --------------------------------------
     const totalEarnings = earnings.reduce((total, item) => total + Number(item.fare), 0);
     // --------------------------------------
-    // Dashboard Response
+    // PENDING DRIVER LEADS
+    //
+    // IMPORTANT:
+    //
+    // BookingDriverLead.driverId = User.id
+    //
+    // Therefore use userId here,
+    // NOT driver.id.
+    // --------------------------------------
+    const pendingRequests = await prisma.bookingDriverLead.count({
+        where: {
+            driverId: userId,
+            booking: {
+                status: {
+                    in: [
+                        "REQUEST_SENT",
+                        "DRIVER_SHARED",
+                        "PENDING",
+                    ],
+                },
+            },
+        },
+    });
+    // --------------------------------------
+    // COMPLETED RIDES
+    // --------------------------------------
+    const completedRides = await prisma.ride.count({
+        where: {
+            booking: {
+                driverId: userId,
+            },
+            status: "COMPLETED",
+        },
+    });
+    // --------------------------------------
+    // DASHBOARD RESPONSE
     // --------------------------------------
     return {
         onlineStatus: driver.availability?.isOnline ??
             false,
         todayRides: earnings.length,
         todayEarnings: totalEarnings,
-        pendingRequests: 0,
-        completedRides: earnings.length,
+        pendingRequests,
+        completedRides,
     };
 };

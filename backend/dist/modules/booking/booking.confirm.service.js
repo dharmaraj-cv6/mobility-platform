@@ -62,18 +62,23 @@ export const confirmBooking = async (bookingId, passengerId) => {
             throw new Error("Driver not found.");
         }
         const availability = driver.availability;
-        if (availability?.reservedByBookingId &&
-            availability.reservedByBookingId !==
-                booking.id) {
+        if (!availability) {
+            throw new Error("Driver availability record not found.");
+        }
+        const reservationOwner = availability.reservedByBookingId;
+        const reservationIsActive = reservationOwner !== null &&
+            reservationOwner !== undefined &&
+            availability.reservedUntil !== null &&
+            availability.reservedUntil !== undefined &&
+            availability.reservedUntil > now;
+        // Block only when another booking has a live reservation.
+        if (reservationIsActive &&
+            reservationOwner !== booking.id) {
             throw new Error("Driver is currently reserved for another passenger. Please choose another driver.");
         }
-        if (availability?.reservedByBookingId ===
-            booking.id &&
-            availability.reservedUntil &&
-            availability.reservedUntil <=
-                now) {
-            throw new Error("Your driver reservation has expired. Please choose another driver.");
-        }
+        // An expired or missing reservation may be reacquired
+        // only if the driver is otherwise available.
+        // The atomic reservation claim must happen before confirmation.
         const existingDriverBooking = await tx.booking.findFirst({
             where: {
                 driverId: booking.driverId,

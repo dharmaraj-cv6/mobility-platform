@@ -89,8 +89,8 @@ export const getAvailableDrivers = async (
     res.status(200).json({
       success: true,
       serviceType,
-      count: drivers.length,
-      data: drivers,
+     count: drivers.drivers.length,
+data: drivers,
     });
   } catch (error) {
     console.error(

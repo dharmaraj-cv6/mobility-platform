@@ -155,8 +155,8 @@ const reservationOwner = availability.reservedByUserId;
 const reservationUntil = availability.reservedUntil;
 
 const hasActiveReservation =
-  Boolean(reservationOwner) &&
-  Boolean(reservationUntil) &&
+  reservationOwner != null &&
+  reservationUntil != null &&
   reservationUntil > now;
 
 // Another passenger owns the active reservation.

@@ -3,6 +3,7 @@ import { verifyToken } from "../utils/jwt.js";
 export const authenticate = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
+        console.log("AUTH HEADER:", authHeader ? "Bearer token received" : "MISSING");
         if (!authHeader ||
             !authHeader.startsWith("Bearer ")) {
             return res.status(401).json({

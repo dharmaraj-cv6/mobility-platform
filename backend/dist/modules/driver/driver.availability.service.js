@@ -3,12 +3,6 @@ const ONLINE_SESSION_MINUTES = 45;
 // ============================================================
 // GET DRIVER PROFILE FROM USER ID
 // ============================================================
-//
-// Authentication gives us User ID.
-// DriverAvailability belongs to DriverProfile.
-//
-// User -> DriverProfile -> DriverAvailability
-// ============================================================
 const getDriverProfileId = async (userId) => {
     const driverProfile = await prisma.driverProfile.findUnique({
         where: {
@@ -35,20 +29,18 @@ export const getAvailability = async (userId) => {
     });
 };
 // ============================================================
-// UPDATE ONLINE / OFFLINE STATUS
+// UPDATE ONLINE / OFFLINE
 // ============================================================
 //
+// ONLY this function changes isOnline.
+//
 // Online:
-// - isOnline = true
-// - lastSeen = now
+//   isOnline = true
 //
 // Offline:
-// - isOnline = false
-// - lastSeen = now
+//   isOnline = false
 //
-// This function controls online status.
-//
-// No onboarding/service/vehicle checks here.
+// GPS updates NEVER change online status.
 // ============================================================
 export const updateAvailability = async (userId, isOnline) => {
     const driverProfileId = await getDriverProfileId(userId);
@@ -73,17 +65,13 @@ export const updateAvailability = async (userId, isOnline) => {
 //
 // IMPORTANT:
 //
-// Location update MUST NOT automatically make the driver
-// online.
+// GPS update does NOT make driver online.
 //
-// Existing availability:
-// - keep current isOnline value
-// - update latitude
-// - update longitude
-// - refresh lastSeen
+// Existing record:
+//   preserve isOnline
 //
-// No availability record:
-// - create record as offline
+// No record:
+//   create OFFLINE
 // ============================================================
 export const updateLocation = async (userId, latitude, longitude) => {
     const driverProfileId = await getDriverProfileId(userId);
@@ -93,12 +81,15 @@ export const updateLocation = async (userId, latitude, longitude) => {
         },
         create: {
             driverProfileId,
+            // GPS must NEVER activate driver.
             isOnline: false,
             currentLatitude: latitude,
             currentLongitude: longitude,
             lastSeen: new Date(),
         },
         update: {
+            // IMPORTANT:
+            // Do not touch isOnline here.
             currentLatitude: latitude,
             currentLongitude: longitude,
             lastSeen: new Date(),
@@ -109,32 +100,92 @@ export const updateLocation = async (userId, latitude, longitude) => {
 // GET ONLINE DRIVERS
 // ============================================================
 //
-// General availability endpoint.
+// This is the GENERAL online-driver list.
 //
-// Only drivers who are:
-// - online
-// - within the current 45-minute session
+// Conditions:
 //
-// are returned.
+// 1. Driver is online
+// 2. Driver's online session is still valid
+// 3. Driver has GPS location
+// 4. User account is active
+// 5. Driver is VERIFIED
+// 6. Onboarding is completed
+// 7. Driver has at least one active vehicle
 //
-// Booking-specific distance/service filtering belongs to
-// booking.selection.repository.ts.
+// IMPORTANT:
+//
+// Do NOT put unknown service fields such as:
+//   services.isActive
+//
+// here.
+//
+// Service/fare eligibility should be handled by the
+// booking-selection layer where the exact service schema
+// is known.
 // ============================================================
 export const getOnlineDrivers = async () => {
     const now = new Date();
     const sessionCutoff = new Date(now.getTime() -
-        ONLINE_SESSION_MINUTES * 60 * 1000);
+        ONLINE_SESSION_MINUTES *
+            60 *
+            1000);
     return prisma.driverProfile.findMany({
         where: {
+            // --------------------------------------------------------
+            // DRIVER APPROVAL
+            // --------------------------------------------------------
+            driverStatus: "VERIFIED",
+            onboardingCompleted: true,
+            // --------------------------------------------------------
+            // USER ACCOUNT
+            // --------------------------------------------------------
+            user: {
+                isActive: true,
+            },
+            // --------------------------------------------------------
+            // AVAILABILITY
+            // --------------------------------------------------------
             availability: {
                 isOnline: true,
                 lastSeen: {
                     gte: sessionCutoff,
                 },
+                currentLatitude: {
+                    not: null,
+                },
+                currentLongitude: {
+                    not: null,
+                },
+            },
+            // --------------------------------------------------------
+            // VEHICLE
+            // --------------------------------------------------------
+            //
+            // At least one active vehicle is required.
+            //
+            // Do NOT require APPROVED here if this endpoint is
+            // intended only as the general online-driver endpoint.
+            //
+            // Booking eligibility can apply vehicle verification.
+            // --------------------------------------------------------
+            Vehicle: {
+                some: {
+                    isActive: true,
+                },
             },
         },
         include: {
+            // --------------------------------------------------------
+            // AVAILABILITY
+            // --------------------------------------------------------
             availability: true,
+            // --------------------------------------------------------
+            // USER
+            // --------------------------------------------------------
+            //
+            // businessName removed because it does not exist in
+            // your current Prisma User model.
+            // --------------------------------------------------------
             user: {
                 select: {
                     id: true,
@@ -142,14 +193,32 @@ export const getOnlineDrivers = async () => {
                     isActive: true,
                 },
             },
+            // --------------------------------------------------------
+            // VEHICLES
+            // --------------------------------------------------------
             Vehicle: {
                 where: {
                     isActive: true,
                 },
-                orderBy: {
-                    isDefault: "desc",
-                },
+                orderBy: [
+                    {
+                        isDefault: "desc",
+                    },
+                    {
+                        createdAt: "asc",
+                    },
+                ],
             },
+            // --------------------------------------------------------
+            // DRIVER SERVICES
+            // --------------------------------------------------------
+            //
+            // IMPORTANT:
+            // No `where: { isActive: true }` here because your
+            // service model does not expose an isActive field.
+            //
+            // Return the services exactly as defined in Prisma.
+            // --------------------------------------------------------
             services: true,
         },
         orderBy: {

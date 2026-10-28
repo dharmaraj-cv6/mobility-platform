@@ -58,40 +58,43 @@ export const getAvailableDrivers = async (pickupLatitude, pickupLongitude, servi
     //
     // Do NOT pass normalizedVehicleType here.
     // ----------------------------------------------------------
-    const drivers = await getAvailableDriversRepository(pickupLatitude, pickupLongitude, normalizedServiceType);
+    const result = await getAvailableDriversRepository(pickupLatitude, pickupLongitude, normalizedServiceType);
     // ----------------------------------------------------------
     // NO VEHICLE FILTER
     // ----------------------------------------------------------
     if (!normalizedVehicleType ||
         normalizedVehicleType === "ALL") {
-        return drivers;
+        return result;
+    }
+    // ----------------------------------------------------------
+    // NO VEHICLE FILTER
+    // ----------------------------------------------------------
+    if (!normalizedVehicleType ||
+        normalizedVehicleType === "ALL") {
+        return result;
     }
     // ----------------------------------------------------------
     // VEHICLE FILTER
+    // Preserve the repository response structure.
     // ----------------------------------------------------------
-    return drivers.filter((driver) => {
-        const driverVehicleType = String(driver.vehicle?.vehicleType ||
-            "")
-            .trim()
-            .toUpperCase();
-        // CAB_4 represents the normal cab category.
-        if (normalizedVehicleType ===
-            "CAB_4") {
-            return (driverVehicleType ===
-                "CAB_4" ||
-                driverVehicleType === "CAB");
-        }
-        // Traveller category.
-        if (normalizedVehicleType ===
-            "TRAVELLER") {
-            return (driverVehicleType ===
-                "TRAVELLER" ||
-                driverVehicleType ===
-                    "TEMPO" ||
-                driverVehicleType ===
-                    "VAN");
-        }
-        return (driverVehicleType ===
-            normalizedVehicleType);
-    });
+    return {
+        ...result,
+        drivers: result.drivers.filter((driver) => {
+            const driverVehicleType = String(driver.vehicle?.vehicleType || "")
+                .trim()
+                .toUpperCase();
+            // CAB_4 represents the normal cab category.
+            if (normalizedVehicleType === "CAB_4") {
+                return (driverVehicleType === "CAB_4" ||
+                    driverVehicleType === "CAB");
+            }
+            // Traveller category.
+            if (normalizedVehicleType === "TRAVELLER") {
+                return (driverVehicleType === "TRAVELLER" ||
+                    driverVehicleType === "TEMPO" ||
+                    driverVehicleType === "VAN");
+            }
+            return driverVehicleType === normalizedVehicleType;
+        }),
+    };
 };

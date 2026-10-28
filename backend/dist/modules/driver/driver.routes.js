@@ -6,6 +6,7 @@ import { registerDriverSchema } from "./driver.validation.js";
 import availabilityRoutes from "./driver.availability.routes.js";
 import { getMyDriverServices, createMyDriverService, updateMyDriverServiceFare, removeMyDriverService, } from "./driver.business.controller.js";
 import riderRoutes from "./driver.riders.routes.js";
+import driverLeadRoutes from "./driver.lead.routes.js";
 const router = Router();
 // ========================================
 // DRIVER REGISTRATION
@@ -31,6 +32,20 @@ router.get("/review", authenticate, DriverController.getDriverReview);
 // ========================================
 router.post("/submit", authenticate, DriverController.submitDriverOnboarding);
 // ========================================
+// DRIVER BOOKING LEADS
+//
+// GET /api/driver/leads
+//
+// Passenger Confirm Booking
+//        ↓
+// Booking created
+//        ↓
+// BookingDriverLead created
+//        ↓
+// Driver dashboard reads lead
+// ========================================
+router.use("/leads", driverLeadRoutes);
+// ========================================
 // NEARBY RIDERS
 // ========================================
 //
@@ -40,8 +55,13 @@ router.post("/submit", authenticate, DriverController.submitDriverOnboarding);
 router.use("/riders", riderRoutes);
 // ========================================
 // GET DRIVER PROFILE
-// IMPORTANT: Keep this AFTER /review,
-// /submit and /riders.
+//
+// IMPORTANT:
+// Keep this AFTER:
+// /review
+// /submit
+// /leads
+// /riders
 // ========================================
 router.get("/:id", authenticate, DriverController.getDriverProfile);
 // ========================================
