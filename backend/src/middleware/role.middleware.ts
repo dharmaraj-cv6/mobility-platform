@@ -15,10 +15,10 @@ export const authorize =
       return;
     }
 
-    if (!roles.includes(req.user.role)) {
+    if (!req.user?.role || !roles.includes(req.user.role)) {
       res.status(403).json({
         success: false,
-        message: "Access denied.",
+        message: "Access denied: insufficient permissions",
       });
       return;
     }
