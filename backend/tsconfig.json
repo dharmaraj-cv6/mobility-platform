@@ -11,6 +11,9 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
+  "files": [
+    "src/types/express.d.ts"
+  ],
   "include": [
     "src/**/*.ts",
     "src/**/*.d.ts"
