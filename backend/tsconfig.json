@@ -17,11 +17,11 @@
     "src/types/express.d.ts"
   ],
   "include": [
-    "src/**/*.ts",
-    "src/**/*.d.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "src/**/*.ts",
+  "src/**/*.d.ts"
+],
+"exclude": [
+  "node_modules",
+  "dist"
+]
 }
