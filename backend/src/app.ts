@@ -58,43 +58,39 @@ const app = express();
 // CORS
 // =====================================================
 
+
 const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  ...(process.env.FRONTEND_URL || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 ];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests without Origin header
-      // Example: Postman / server-to-server requests
       if (!origin) {
-        callback(null, true);
-        return;
+        return callback(null, true);
       }
 
-      // Allow known frontend origins
       if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-        return;
+        return callback(null, true);
       }
 
-      // Development: allow localhost / 127.0.0.1
-      // on any frontend port
       if (
         /^http:\/\/localhost:\d+$/.test(origin) ||
         /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)
       ) {
-        callback(null, true);
-        return;
+        return callback(null, true);
       }
 
-      // Reject unknown origins
-      callback(null, false);
+      return callback(
+        new Error(`CORS blocked origin: ${origin}`)
+      );
     },
-
     credentials: true,
-
     methods: [
       "GET",
       "POST",
@@ -103,7 +99,6 @@ app.use(
       "DELETE",
       "OPTIONS",
     ],
-
     allowedHeaders: [
       "Content-Type",
       "Authorization",
@@ -111,10 +106,10 @@ app.use(
       "Cache-Control",
       "Pragma",
     ],
-
     optionsSuccessStatus: 204,
   })
 );
+
 
 // =====================================================
 // SECURITY
